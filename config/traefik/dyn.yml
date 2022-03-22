@@ -1,0 +1,28 @@
+## Dynamic configuration
+http:
+  routers:
+    wildcard-cert:
+      rule: "Host(`toto.box`)"
+      entrypoints:
+        - web
+        #- front-http
+        #- front-https
+      #tls:
+      #  certresolver:
+      #  domains:
+      #    - main: example.com
+      #      sans: "*.example.com"
+      service: forward-local-1313
+
+  services:
+    forward-local-1313:
+      loadBalancer:
+        servers:
+          - url: 'http://10.127.0.10:1313'
+
+
+  middlewares:
+    https-redirect:
+      redirectScheme:
+        scheme: https
+

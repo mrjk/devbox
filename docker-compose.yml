@@ -4,17 +4,37 @@ services:
   traefik:
     image: "traefik"
     command:
+      - "--providers.file=true"
+      - "--providers.file.directory=/config"
+      - "--providers.file.filename=/config/dyn.yml"
+      - "--providers.file.watch=true"
+
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
+#      - "--entrypoints.front-dns-tcp.address=:53"
+#      - "--entrypoints.front-dns-udp.address=:53/udp"
       - "--api.insecure=true"
       - "--api.dashboard=true"
       - "--log.level=DEBUG"
     ports:
-      - "80:80"
-      - "8080:8080"
+#      - "${PUBLIC_IP}:53:53/udp"
+#      - "${PUBLIC_IP}:53:53/tcp"
+      - "${PUBLIC_IP}:80:80"
+      - "${PUBLIC_IP}:8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - ./config/traefik:/config:ro
+      - ./config/letsencrypt:/letsencrypt:ro
+#      - ./config/traefik.yml:/traefik.yml:ro
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.routers.api.rule=Host(`${TRAEFIK_DOMAIN}`)"
+      - "traefik.http.routers.api.service=api@internal"
+
+
 
   portainer:
     image: portainer/portainer
@@ -30,20 +50,35 @@ services:
   dnsmasq:
     image: jpillora/dnsmasq
     restart: always
+    expose:
+      - 53/tcp
+      - 53/udp
+      - "8080"
     ports:
-      - 53:53/udp
-      - 5380:8080
+      - "${PUBLIC_IP}:5380:8080"
+      - "${PUBLIC_IP}:53:53/tcp"
+      - "${PUBLIC_IP}:53:53/udp"
     environment:
       HTTP_USER: ${DNSMASQ_USER}
       HTTP_PASS: ${DNSMASQ_PASSWORD}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dnsmasq.rule=Host(`${DNSMASQ_DOMAIN}`)"
-      - "traefik.http.services.dnsmasq.loadbalancer.server.port=8080"
       - "traefik.http.routers.dnsmasq.entrypoints=web"
+      - "traefik.http.services.dnsmasq.loadbalancer.server.port=8080"
+
+#      - "traefik.udp.routers.dnsmasq-udp.entrypoints=front-dns-udp"
+#      - "traefik.udp.routers.dnsmasq-udp.service=dnsmasq-udp-svc"
+#      - "traefik.udp.services.dnsmasq-udp-svc.loadbalancer.server.port=53/udp"
+#
+#      - "traefik.tcp.routers.dnsmasq-tcp.entrypoints=front-dns-tcp"
+#      - "traefik.tcp.routers.dnsmasq-tcp.service=dnsmasq-tcp-svc"
+#      - "traefik.tcp.routers.dnsmasq-tcp.rule=HostSNI(`*`)"
+#      - "traefik.tcp.services.dnsmasq-tcp-svc.loadbalancer.server.port=53/tcp"
+
     volumes:
-      - ./dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf
-      - ./dnsmasq/dnsmasq.d/:/etc/dnsmasq.d
+      - ./config/dnsmasq.conf:/etc/dnsmasq.conf
+      - ./config/dnsmasq.d/:/etc/dnsmasq.d
 
 volumes:
   portainer_data:
